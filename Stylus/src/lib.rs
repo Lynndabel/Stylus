@@ -39,6 +39,12 @@ sol_storage! {
         
         // Platform fee percentage (e.g., 250 = 2.5%)
         uint256 platform_fee_basis_points;
+        
+        // Address receiving platform fees
+        address fee_recipient;
+        
+        // Total platform fees accrued (in wei)
+        uint256 platform_fees_accrued;
     }
     
     pub struct CreatorProfile {
@@ -74,6 +80,22 @@ sol! {
     event CreatorProfileUpdated(
         address indexed creator
     );
+
+    event PlatformFeeUpdated(
+        uint256 oldFeeBps,
+        uint256 newFeeBps
+    );
+
+    event FeeRecipientUpdated(
+        address oldRecipient,
+        address newRecipient
+    );
+
+    event PlatformFeeAccrued(
+        address indexed supporter,
+        address indexed creator,
+        uint256 feeAmount
+    );
 }
 
 #[public]
@@ -83,6 +105,8 @@ impl CoffeeFactory {
     pub fn constructor(&mut self, platform_fee_bp: U256) {
         self.factory_owner.set(msg::sender());
         self.platform_fee_basis_points.set(platform_fee_bp); // e.g., 250 = 2.5%
+        // default fee recipient to deployer/owner
+        self.fee_recipient.set(msg::sender());
     }
 
     /// Register as a creator (free)
@@ -148,6 +172,10 @@ impl CoffeeFactory {
         let platform_fee = (amount * self.platform_fee_basis_points.get()) / U256::from(10000u32);
         let creator_amount = amount - platform_fee;
         
+        // Accrue platform fee in storage for transparent accounting
+        let accrued = self.platform_fees_accrued.get();
+        self.platform_fees_accrued.set(accrued + platform_fee);
+
         // Update creator balance and stats
         let current_balance = self.creator_balances.get(creator);
         self.creator_balances.setter(creator).set(current_balance + creator_amount);
@@ -163,6 +191,11 @@ impl CoffeeFactory {
             creator,
             amount,
             message,
+        });
+        evm::log(PlatformFeeAccrued {
+            supporter,
+            creator,
+            feeAmount: platform_fee,
         });
         
         Ok(())
@@ -250,6 +283,16 @@ impl CoffeeFactory {
         self.platform_fee_basis_points.get()
     }
 
+    /// Get the current fee recipient address
+    pub fn get_fee_recipient(&self) -> Address {
+        self.fee_recipient.get()
+    }
+
+    /// Get total accrued platform fees (in wei)
+    pub fn get_platform_fees_accrued(&self) -> U256 {
+        self.platform_fees_accrued.get()
+    }
+
     /// Factory owner functions
     pub fn withdraw_platform_fees(&mut self) -> Result<(), Vec<u8>> {
         let caller = msg::sender();
@@ -259,17 +302,45 @@ impl CoffeeFactory {
             return Err("Only factory owner can withdraw platform fees".as_bytes().to_vec());
         }
         
-        // Platform fees are accumulated in contract balance minus creator balances
-        let total_creator_balances = self.get_total_creator_balances();
-        let contract_balance = evm::balance(evm::address());
-        let platform_fees = contract_balance - total_creator_balances;
-        
-        if platform_fees > U256::ZERO {
-            transfer_eth(factory_owner, platform_fees).map_err(|e| {
-                format!("Transfer failed: {:?}", e).as_bytes().to_vec()
-            })?;
+        let fees = self.platform_fees_accrued.get();
+        if fees == U256::ZERO {
+            return Ok(());
         }
+        let recipient = self.fee_recipient.get();
+        transfer_eth(recipient, fees).map_err(|e| {
+            format!("Transfer failed: {:?}", e).as_bytes().to_vec()
+        })?;
+        // reset accrued after successful transfer
+        self.platform_fees_accrued.set(U256::ZERO);
         
+        Ok(())
+    }
+
+    /// Owner-only: set new platform fee basis points (max 500 bps = 5%)
+    pub fn set_platform_fee_basis_points(&mut self, new_bps: U256) -> Result<(), Vec<u8>> {
+        let caller = msg::sender();
+        if caller != self.factory_owner.get() {
+            return Err("Only factory owner can set platform fee".as_bytes().to_vec());
+        }
+        let max_bps = U256::from(500u32);
+        if new_bps > max_bps {
+            return Err("Fee too high".as_bytes().to_vec());
+        }
+        let old = self.platform_fee_basis_points.get();
+        self.platform_fee_basis_points.set(new_bps);
+        evm::log(PlatformFeeUpdated { oldFeeBps: old, newFeeBps: new_bps });
+        Ok(())
+    }
+
+    /// Owner-only: update fee recipient address
+    pub fn set_fee_recipient(&mut self, new_recipient: Address) -> Result<(), Vec<u8>> {
+        let caller = msg::sender();
+        if caller != self.factory_owner.get() {
+            return Err("Only factory owner can set fee recipient".as_bytes().to_vec());
+        }
+        let old = self.fee_recipient.get();
+        self.fee_recipient.set(new_recipient);
+        evm::log(FeeRecipientUpdated { oldRecipient: old, newRecipient: new_recipient });
         Ok(())
     }
 
