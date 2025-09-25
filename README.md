@@ -1,214 +1,453 @@
-![Image](./header.png)
+# ☕ Gyfted
 
-# Stylus Hello World
+**Decentralized Creator Support Platform - Powered by Stylus**
 
-Project starter template for writing Arbitrum Stylus programs in Rust using the [stylus-sdk](https://github.com/OffchainLabs/stylus-sdk-rs). It includes a Rust implementation of a basic counter Ethereum smart contract:
+Gyfted is a revolutionary Web3 platform that enables creators to receive cryptocurrency tips from their supporters through a unified, gas-efficient smart contract system. Built on Arbitrum using the Stylus SDK, Gyfted provides a seamless tipping experience for content creators, developers, artists, and anyone building in the digital space.
 
-```js
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+## 🌟 Features
 
-contract Counter {
-    uint256 public number;
+### For Creators
+- **🆓 Free Registration** - No contract deployment costs
+- **👤 Rich Profiles** - Name, bio, avatar, and custom links
+- **💰 Direct Tips** - Receive ETH directly from supporters
+- **📊 Analytics Dashboard** - Track tips, supporter count, and earnings
+- **🔐 Self-Custody** - Withdraw your tips anytime to your wallet
+- **🌐 Discoverability** - Get found by new supporters
 
-    function setNumber(uint256 newNumber) public {
-        number = newNumber;
+### For Supporters  
+- **🎯 Easy Tipping** - Send ETH with personalized messages
+- **🔍 Creator Discovery** - Browse and discover new creators
+- **💬 Message Support** - Send encouragement with your tips
+- **⚡ Low Gas Fees** - Efficient Stylus smart contracts
+- **🔗 Web3 Native** - Connect any Ethereum-compatible wallet
+
+### For the Platform
+- **🏭 Factory Pattern** - One contract serves all creators
+- **💼 Revenue Model** - Optional platform fees (2.5% default)
+- **🛠️ Upgradeable** - Modular architecture for improvements
+- **📈 Analytics** - Platform-wide statistics and insights
+
+## 🏗️ Architecture
+
+Gyfted uses a factory contract pattern where a single smart contract manages multiple creators:
+
+```
+Gyfted Factory Contract
+├── Creator Registry (profiles, balances)
+├── Tip Processing (with optional platform fees)
+├── Withdrawal System (creator-specific balances)
+└── Discovery System (public creator listings)
+```
+
+**Key Components:**
+- **Factory Contract**: Main contract managing all creators
+- **Creator Profiles**: On-chain metadata (name, bio, avatar)
+- **Tip Balances**: Individual creator balances
+- **Event System**: Real-time tip notifications
+- **Fee Management**: Optional platform sustainability model
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Rust](https://rustup.rs/) (latest stable)
+- [Cargo Stylus](https://docs.arbitrum.io/stylus/cargo-stylus)
+- [Node.js](https://nodejs.org/) v18+ (for frontend)
+- An Arbitrum testnet wallet with ETH
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/gyfted.git
+   cd gyfted
+   ```
+
+2. **Install Stylus toolchain**
+   ```bash
+   cargo install cargo-stylus
+   ```
+
+3. **Build the contract**
+   ```bash
+   cargo build --release --target wasm32-unknown-unknown
+   ```
+
+4. **Deploy to Arbitrum Sepolia**
+   ```bash
+   cargo stylus deploy \
+     --private-key="your-private-key" \
+     --endpoint="https://sepolia-rollup.arbitrum.io/rpc"
+   ```
+
+5. **Export ABI for frontend integration**
+   ```bash
+   cargo stylus export-abi
+   ```
+
+### Smart Contract Usage
+
+#### For Creators
+
+**Register as a creator:**
+```rust
+// Call this function to join Gyfted
+register_creator(
+    name: "Alice Developer",
+    bio: "Full-stack developer building Web3 tools", 
+    avatar_url: "https://example.com/alice.jpg"
+)
+```
+
+**Update your profile:**
+```rust
+update_profile(
+    name: "Alice | Rust Developer", 
+    bio: "Building the future with Rust and Web3",
+    avatar_url: "https://newurl.com/alice.jpg"
+)
+```
+
+**Withdraw your tips:**
+```rust
+withdraw_my_tips() // Sends all accumulated tips to your wallet
+```
+
+#### For Supporters
+
+**Send a tip:**
+```rust
+tip_creator(
+    creator: "0x742d35Cc6Bf5432532532B4C9c47",
+    message: "Love your tutorials! Keep it up! 🚀"
+) // Send ETH with the transaction
+```
+
+#### View Functions
+
+```rust
+// Get creator profile
+get_creator_profile(creator_address)
+
+// Check creator's tip balance  
+get_creator_balance(creator_address)
+
+// Browse all creators
+get_registered_creators()
+
+// Check platform fee
+get_platform_fee() // Returns basis points (250 = 2.5%)
+```
+
+## 💻 Frontend Integration
+
+### Web3 Setup
+
+```javascript
+import { ethers } from 'ethers';
+import GiftedABI from './contracts/Gyfted.json';
+
+// Connect to contract
+const provider = new ethers.providers.Web3Provider(window.ethereum);
+const contract = new ethers.Contract(contractAddress, GiftedABI, provider);
+
+// Send a tip
+async function tipCreator(creatorAddress, message, amount) {
+  const signer = provider.getSigner();
+  const contractWithSigner = contract.connect(signer);
+  
+  const tx = await contractWithSigner.tip_creator(
+    creatorAddress,
+    message,
+    { value: ethers.utils.parseEther(amount) }
+  );
+  
+  return await tx.wait();
+}
+
+// Listen for tip events
+contract.on("TipSent", (supporter, creator, amount, message) => {
+  console.log(`${supporter} tipped ${creator}: ${message}`);
+});
+```
+
+### React Component Example
+
+```jsx
+import { useState, useEffect } from 'react';
+
+function CreatorProfile({ creatorAddress }) {
+  const [profile, setProfile] = useState(null);
+  const [tipAmount, setTipAmount] = useState('0.001');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    loadCreatorProfile();
+  }, [creatorAddress]);
+
+  const loadCreatorProfile = async () => {
+    const profileData = await contract.get_creator_profile(creatorAddress);
+    setProfile(profileData);
+  };
+
+  const sendTip = async () => {
+    try {
+      await tipCreator(creatorAddress, message, tipAmount);
+      alert('Tip sent successfully!');
+      setMessage('');
+    } catch (error) {
+      alert('Error sending tip: ' + error.message);
+    }
+  };
+
+  return (
+    <div className="creator-card">
+      <img src={profile?.avatar_url} alt={profile?.name} />
+      <h3>{profile?.name}</h3>
+      <p>{profile?.bio}</p>
+      
+      <div className="tip-form">
+        <input 
+          type="number" 
+          value={tipAmount} 
+          onChange={(e) => setTipAmount(e.target.value)}
+          step="0.001"
+          min="0.001"
+          placeholder="Amount in ETH"
+        />
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Send a message of support..."
+        />
+        <button onClick={sendTip}>Send Tip ☕</button>
+      </div>
+    </div>
+  );
+}
+```
+
+## 🧪 Testing
+
+### Unit Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test test_factory_system
+
+# Run with output
+cargo test -- --nocapture
+```
+
+### Integration Tests
+
+```bash
+# Deploy to local testnet
+cargo stylus deploy --endpoint="http://localhost:8547"
+
+# Run integration test suite
+npm run test:integration
+```
+
+### Example Test Cases
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creator_registration() {
+        let mut factory = CoffeeFactory::default();
+        factory.constructor(U256::from(250)); // 2.5% fee
+        
+        // Register creator
+        let result = factory.register_creator(
+            "Alice".to_string(),
+            "Developer".to_string(), 
+            "https://alice.com/avatar.jpg".to_string()
+        );
+        assert!(result.is_ok());
+        
+        // Verify registration
+        let profile = factory.get_creator_profile(msg::sender());
+        assert!(profile.is_active);
+        assert_eq!(profile.name, "Alice");
     }
 
-    function increment() public {
-        number++;
+    #[test]
+    fn test_tipping_flow() {
+        // Test complete tip -> withdraw flow
+        // Implementation details...
     }
 }
 ```
 
-To set up more minimal example that still uses the Stylus SDK, use `cargo stylus new --minimal <YOUR_PROJECT_NAME>` under [OffchainLabs/cargo-stylus](https://github.com/OffchainLabs/cargo-stylus).
+## 📊 Smart Contract Details
 
-## Quick Start 
+### Storage Layout
 
-Install [Rust](https://www.rust-lang.org/tools/install), and then install the Stylus CLI tool with Cargo
-
-```bash
-cargo install --force cargo-stylus cargo-stylus-check
-```
-
-Add the `wasm32-unknown-unknown` build target to your Rust compiler:
-
-```
-rustup target add wasm32-unknown-unknown
-```
-
-You should now have it available as a Cargo subcommand:
-
-```bash
-cargo stylus --help
-```
-
-Then, clone the template:
-
-```
-git clone https://github.com/OffchainLabs/stylus-hello-world && cd stylus-hello-world
-```
-
-### Testnet Information
-
-All testnet information, including faucets and RPC endpoints can be found [here](https://docs.arbitrum.io/stylus/reference/testnet-information).
-
-### ABI Export
-
-You can export the Solidity ABI for your program by using the `cargo stylus` tool as follows:
-
-```bash
-cargo stylus export-abi
-```
-
-which outputs:
-
-```js
-/**
- * This file was automatically generated by Stylus and represents a Rust program.
- * For more information, please see [The Stylus SDK](https://github.com/OffchainLabs/stylus-sdk-rs).
- */
-
-// SPDX-License-Identifier: MIT-OR-APACHE-2.0
-pragma solidity ^0.8.23;
-
-interface ICounter {
-    function number() external view returns (uint256);
-
-    function setNumber(uint256 new_number) external;
-
-    function mulNumber(uint256 new_number) external;
-
-    function addNumber(uint256 new_number) external;
-
-    function increment() external;
+```rust
+pub struct CoffeeFactory {
+    // Creator balances: creator_address => tip_balance
+    mapping(address => uint256) creator_balances;
+    
+    // Creator profiles: creator_address => profile_data
+    mapping(address => CreatorProfile) creator_profiles;
+    
+    // All registered creators for discovery
+    address[] registered_creators;
+    
+    // Platform configuration
+    address factory_owner;
+    uint256 platform_fee_basis_points; // 250 = 2.5%
 }
 ```
 
-Exporting ABIs uses a feature that is enabled by default in your Cargo.toml:
+### Events
 
-```toml
-[features]
-export-abi = ["stylus-sdk/export-abi"]
-```
-
-## Deploying
-
-You can use the `cargo stylus` command to also deploy your program to the Stylus testnet. We can use the tool to first check
-our program compiles to valid WASM for Stylus and will succeed a deployment onchain without transacting. By default, this will use the Stylus testnet public RPC endpoint. See here for [Stylus testnet information](https://docs.arbitrum.io/stylus/reference/testnet-information)
-
-```bash
-cargo stylus check
-```
-
-If successful, you should see:
-
-```bash
-Finished release [optimized] target(s) in 1.88s
-Reading WASM file at stylus-hello-world/target/wasm32-unknown-unknown/release/stylus-hello-world.wasm
-Compressed WASM size: 8.9 KB
-Program succeeded Stylus onchain activation checks with Stylus version: 1
-```
-
-Next, we can estimate the gas costs to deploy and activate our program before we send our transaction. Check out the [cargo-stylus](https://github.com/OffchainLabs/cargo-stylus) README to see the different wallet options for this step:
-
-```bash
-cargo stylus deploy \
-  --private-key-path=<PRIVKEY_FILE_PATH> \
-  --estimate-gas
-```
-
-You will then see the estimated gas cost for deploying before transacting:
-
-```bash
-Deploying program to address e43a32b54e48c7ec0d3d9ed2d628783c23d65020
-Estimated gas for deployment: 1874876
-```
-
-The above only estimates gas for the deployment tx by default. To estimate gas for activation, first deploy your program using `--mode=deploy-only`, and then run `cargo stylus deploy` with the `--estimate-gas` flag, `--mode=activate-only`, and specify `--activate-program-address`.
-
-
-Here's how to deploy:
-
-```bash
-cargo stylus deploy \
-  --private-key-path=<PRIVKEY_FILE_PATH>
-```
-
-The CLI will send 2 transactions to deploy and activate your program onchain.
-
-```bash
-Compressed WASM size: 8.9 KB
-Deploying program to address 0x457b1ba688e9854bdbed2f473f7510c476a3da09
-Estimated gas: 1973450
-Submitting tx...
-Confirmed tx 0x42db…7311, gas used 1973450
-Activating program at address 0x457b1ba688e9854bdbed2f473f7510c476a3da09
-Estimated gas: 14044638
-Submitting tx...
-Confirmed tx 0x0bdb…3307, gas used 14044638
-```
-
-Once both steps are successful, you can interact with your program as you would with any Ethereum smart contract.
-
-## Calling Your Program
-
-This template includes an example of how to call and transact with your program in Rust using [ethers-rs](https://github.com/gakonst/ethers-rs) under the `examples/counter.rs`. However, your programs are also Ethereum ABI equivalent if using the Stylus SDK. **They can be called and transacted with using any other Ethereum tooling.**
-
-By using the program address from your deployment step above, and your wallet, you can attempt to call the counter program and increase its value in storage:
-
-```rs
-abigen!(
-    Counter,
-    r#"[
-        function number() external view returns (uint256)
-        function setNumber(uint256 number) external
-        function increment() external
-    ]"#
+```rust
+// Emitted when someone sends a tip
+event TipSent(
+    address indexed supporter,
+    address indexed creator,
+    uint256 amount,
+    string message
 );
-let counter = Counter::new(address, client);
-let num = counter.number().call().await;
-println!("Counter number value = {:?}", num);
 
-let _ = counter.increment().send().await?.await?;
-println!("Successfully incremented counter via a tx");
+// Emitted when a creator registers
+event CreatorRegistered(
+    address indexed creator,
+    string name
+);
 
-let num = counter.number().call().await;
-println!("New counter number value = {:?}", num);
+// Emitted when tips are withdrawn
+event TipsWithdrawn(
+    address indexed creator,
+    uint256 amount,
+    uint256 platform_fee
+);
 ```
 
-Before running, set the following env vars or place them in a `.env` file (see: [.env.example](./.env.example)) in this project:
+### Gas Costs (Approximate)
 
+| Function | Gas Cost | USD (20 gwei) |
+|----------|----------|---------------|
+| Register Creator | ~80,000 | ~$2.40 |
+| Send Tip | ~50,000 | ~$1.50 |
+| Withdraw Tips | ~45,000 | ~$1.35 |
+| Update Profile | ~35,000 | ~$1.05 |
+
+## 🔒 Security Considerations
+
+### Access Control
+- ✅ Creators can only withdraw their own tips
+- ✅ Only factory owner can withdraw platform fees
+- ✅ Profile updates restricted to profile owner
+- ✅ Input validation on all functions
+
+### Economic Security
+- ✅ Reentrancy protection on withdrawals
+- ✅ Integer overflow protection (Rust native)
+- ✅ Platform fee caps (max 10%)
+- ✅ Minimum tip amounts to prevent spam
+
+### Best Practices
+- 🔍 **Audit Required**: This contract needs professional audit before mainnet
+- 🧪 **Test Thoroughly**: Extensive testing on testnets required
+- 📊 **Monitor Events**: Set up monitoring for unusual activity
+- 🔒 **Multisig**: Consider multisig for factory owner operations
+
+## 🛣️ Roadmap
+
+### Phase 1: Core Platform ✅
+- [x] Factory contract architecture
+- [x] Creator registration system
+- [x] Basic tipping functionality
+- [x] Profile management
+
+### Phase 2: Enhanced Features 🔄
+- [ ] Subscription tipping (monthly/recurring)
+- [ ] Tip goals and milestones
+- [ ] Creator verification system
+- [ ] Advanced analytics dashboard
+
+### Phase 3: Platform Growth 📈
+- [ ] Mobile app (React Native)
+- [ ] Social features (creator following)
+- [ ] Integration APIs for external platforms
+- [ ] Multi-token support (USDC, DAI, etc.)
+
+### Phase 4: Ecosystem 🌐
+- [ ] Creator NFT rewards
+- [ ] Governance token (GYFT)
+- [ ] DAO treasury management
+- [ ] Cross-chain support
+
+## 🤝 Contributing
+
+We welcome contributions from developers, designers, and Web3 enthusiasts!
+
+### Development Setup
+
+1. **Fork the repository**
+2. **Create feature branch**: `git checkout -b feature/amazing-feature`
+3. **Install dependencies**: `npm install && cargo build`
+4. **Run tests**: `cargo test && npm test`
+5. **Submit PR**: Make sure tests pass and code is documented
+
+### Contribution Areas
+
+- **Smart Contract**: Rust/Stylus development
+- **Frontend**: React/TypeScript/Web3 integration  
+- **Design**: UI/UX improvements
+- **Documentation**: Tutorials, guides, API docs
+- **Testing**: Security audits, integration tests
+
+### Code Style
+
+```bash
+# Format Rust code
+cargo fmt
+
+# Lint Rust code  
+cargo clippy
+
+# Format TypeScript/JavaScript
+npm run format
+
+# Lint frontend code
+npm run lint
 ```
-RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
-STYLUS_CONTRACT_ADDRESS=<the onchain address of your deployed program>
-PRIV_KEY_PATH=<the file path for your priv key to transact with>
-```
 
-Next, run:
+## 📄 License
 
-```
-cargo run --example counter --target=<YOUR_ARCHITECTURE>
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Where you can find `YOUR_ARCHITECTURE` by running `rustc -vV | grep host`. For M1 Apple computers, for example, this is `aarch64-apple-darwin` and for most Linux x86 it is `x86_64-unknown-linux-gnu`
+## 📞 Support & Community
 
-## Build Options
+- **Documentation**: [docs.gyfted.com](https://docs.gyfted.com)
+- **Discord**: [discord.gg/gyfted](https://discord.gg/gyfted)
+- **Twitter**: [@gyfted_app](https://twitter.com/gyfted_app)
+- **Email**: hello@gyfted.com
+- **GitHub Issues**: [Report bugs](https://github.com/your-username/gyfted/issues)
 
-By default, the cargo stylus tool will build your project for WASM using sensible optimizations, but you can control how this gets compiled by seeing the full README for [cargo stylus](https://github.com/OffchainLabs/cargo-stylus). If you wish to optimize the size of your compiled WASM, see the different options available [here](https://github.com/OffchainLabs/cargo-stylus/blob/main/OPTIMIZING_BINARIES.md).
+## 🔗 Links
 
-## Peeking Under the Hood
+- **Live App**: [app.gyfted.com](https://app.gyfted.com)
+- **Arbitrum Contract**: `0x...` (Coming soon)
+- **Block Explorer**: [arbiscan.io](https://arbiscan.io)
+- **Stylus Docs**: [docs.arbitrum.io/stylus](https://docs.arbitrum.io/stylus)
 
-The [stylus-sdk](https://github.com/OffchainLabs/stylus-sdk-rs) contains many features for writing Stylus programs in Rust. It also provides helpful macros to make the experience for Solidity developers easier. These macros expand your code into pure Rust code that can then be compiled to WASM. If you want to see what the `stylus-hello-world` boilerplate expands into, you can use `cargo expand` to see the pure Rust code that will be deployed onchain.
+## ⚠️ Disclaimer
 
-First, run `cargo install cargo-expand` if you don't have the subcommand already, then:
+Gyfted is experimental software. Use at your own risk. Always do your own research and never invest more than you can afford to lose. This software has not been audited and should not be used with significant funds without proper security review.
 
-```
-cargo expand --all-features --release --target=<YOUR_ARCHITECTURE>
-```
+---
 
-Where you can find `YOUR_ARCHITECTURE` by running `rustc -vV | grep host`. For M1 Apple computers, for example, this is `aarch64-apple-darwin`.
+**Built with ❤️ by the Web3 community**
 
-## License
-
-This project is fully open source, including an Apache-2.0 or MIT license at your choosing under your own copyright.
+*Empowering creators in the decentralized future*
